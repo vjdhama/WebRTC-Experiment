@@ -1,20 +1,28 @@
-﻿var config = {
-    openSocket: function (config) {
-        if (!window.Firebase) return;
-        var channel = config.channel || location.hash.replace('#', '') || 'video-broadcast';
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+var config = {
+    openSocket: function(config) {
+        // https://github.com/muaz-khan/WebRTC-Experiment/blob/master/Signaling.md
+        // This method "openSocket" can be defined in HTML page
+        // to use any signaling gateway either XHR-Long-Polling or SIP/XMPP or WebSockets/Socket.io
+        // or WebSync/SignalR or existing implementations like signalmaster/peerserver or sockjs etc.
+
+        var channel = config.channel || location.href.replace( /\/|:|#|%|\.|\[|\]/g , '');
         var socket = new Firebase('https://chat.firebaseIO.com/' + channel);
         socket.channel = channel;
-        socket.on("child_added", function (data) {
-            config.onmessage && config.onmessage(data.val());
+        socket.on('child_added', function(data) {
+            config.onmessage(data.val());
         });
-        socket.send = function (data) {
+        socket.send = function(data) {
             this.push(data);
-        }
+        };
         config.onopen && setTimeout(config.onopen, 1);
         socket.onDisconnect().remove();
         return socket;
     },
-    onRemoteStream: function (media) {
+    onRemoteStream: function(media) {
         var video = media.video;
         video.setAttribute('controls', true);
 
@@ -23,21 +31,21 @@
         video.play();
         rotateVideo(video);
     },
-    onRoomFound: function (room) {
+    onRoomFound: function(room) {
         var alreadyExist = document.getElementById(room.broadcaster);
         if (alreadyExist) return;
 
-        if(typeof roomsList === 'undefined') roomsList = document.body;
+        if (typeof roomsList === 'undefined') roomsList = document.body;
 
         var tr = document.createElement('tr');
         tr.setAttribute('id', room.broadcaster);
-        tr.innerHTML = '<td style="width:80%;">' + room.roomName + '</td>' +
-					   '<td><button class="join" id="' + room.roomToken + '">Join Room</button></td>';
+        tr.innerHTML = '<td>' + room.roomName + '</td>' +
+            '<td><button class="join" id="' + room.roomToken + '">Join Room</button></td>';
         roomsList.insertBefore(tr, roomsList.firstChild);
 
-        tr.onclick = function () {
-			var tr = this;
-            captureUserMedia(function () {
+        tr.onclick = function() {
+            tr = this;
+            captureUserMedia(function() {
                 broadcastUI.joinRoom({
                     roomToken: tr.querySelector('.join').id,
                     joinUser: tr.id
@@ -49,12 +57,12 @@
 };
 
 function createButtonClickHandler() {
-    captureUserMedia(function () {
+    captureUserMedia(function() {
         broadcastUI.createRoom({
             roomName: (document.getElementById('conference-name') || { }).value || 'Anonymous'
         });
     });
-	hideUnnecessaryStuff();
+    hideUnnecessaryStuff();
 }
 
 function captureUserMedia(callback) {
@@ -62,18 +70,19 @@ function captureUserMedia(callback) {
     video.setAttribute('autoplay', true);
     video.setAttribute('controls', true);
     participants.insertBefore(video, participants.firstChild);
-	
+
     getUserMedia({
         video: video,
-        onsuccess: function (stream) {
+        onsuccess: function(stream) {
             config.attachStream = stream;
             callback && callback();
 
             video.setAttribute('muted', true);
-			rotateVideo(video);
+            rotateVideo(video);
         },
-        onerror: function () {
-            alert('unable to get access to your webcam');
+        onerror: function() {
+            alert('unable to get access to your webcam.');
+            callback && callback();
         }
     });
 }
@@ -88,27 +97,24 @@ var roomsList = document.getElementById('rooms-list');
 
 if (startConferencing) startConferencing.onclick = createButtonClickHandler;
 
-function hideUnnecessaryStuff()
-{
-	var visibleElements = document.getElementsByClassName('visible'),
-		length = visibleElements.length;
-	for(var i = 0; i< length; i++)
-	{
-		visibleElements[i].style.display = 'none';
-	}
+function hideUnnecessaryStuff() {
+    var visibleElements = document.getElementsByClassName('visible'),
+        length = visibleElements.length;
+    for (var i = 0; i < length; i++) {
+        visibleElements[i].style.display = 'none';
+    }
 }
 
-function rotateVideo(video)
-{
-	video.style[navigator.mozGetUserMedia ? 'transform' : '-webkit-transform'] = 'rotate(0deg)';
-	setTimeout(function() {
-		video.style[navigator.mozGetUserMedia ? 'transform' : '-webkit-transform'] = 'rotate(360deg)';
-	}, 1000);
+function rotateVideo(video) {
+    video.style[navigator.mozGetUserMedia ? 'transform' : '-webkit-transform'] = 'rotate(0deg)';
+    setTimeout(function() {
+        video.style[navigator.mozGetUserMedia ? 'transform' : '-webkit-transform'] = 'rotate(360deg)';
+    }, 1000);
 }
 
 (function() {
     var uniqueToken = document.getElementById('unique-token');
     if (uniqueToken)
-        if (location.hash.length > 2) uniqueToken.parentNode.parentNode.parentNode.innerHTML = '<input type=text value="' + location.href + '" style="width:100%;text-align:center;" title="You can share this private link with your friends.">';
-        else uniqueToken.innerHTML = uniqueToken.parentNode.parentNode.href = (function() { return "#private-" + ("" + 1e10).replace( /[018]/g , function(a) { return (a ^ Math.random() * 16 >> a / 4).toString(16); }); })();
+        if (location.hash.length > 2) uniqueToken.parentNode.parentNode.parentNode.innerHTML = '<h2 style="text-align:center;"><a href="' + location.href + '" target="_blank">Share this link</a></h2>';
+        else uniqueToken.innerHTML = uniqueToken.parentNode.parentNode.href = '#' + (Math.random() * new Date().getTime()).toString(36).toUpperCase().replace( /\./g , '-');
 })();

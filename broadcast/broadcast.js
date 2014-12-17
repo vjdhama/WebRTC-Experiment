@@ -1,12 +1,26 @@
-﻿var broadcast = function (config) {
-    var self = { userToken: uniqueToken() },
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+// This library is known as multi-user connectivity wrapper!
+// It handles connectivity tasks to make sure two or more users can interconnect!
+
+var broadcast = function(config) {
+    var self = {
+        userToken: uniqueToken()
+    },
         channels = '--',
         isbroadcaster,
         isGetNewRoom = true,
-        defaultSocket = {};
+        defaultSocket = { };
 
     function openDefaultSocket() {
-        defaultSocket = config.openSocket({onmessage: onDefaultSocketResponse});
+        defaultSocket = config.openSocket({
+            onmessage: onDefaultSocketResponse,
+            callback: function(socket) {
+                defaultSocket = socket;
+            }
+        });
     }
 
     function onDefaultSocketResponse(response) {
@@ -29,21 +43,26 @@
         var socketConfig = {
             channel: _config.channel,
             onmessage: socketResponse,
-            onopen: function () {
+            onopen: function() {
                 if (isofferer && !peer) initPeer();
             }
+        };
+
+        socketConfig.callback = function(_socket) {
+            socket = _socket;
+            this.onopen();
         };
 
         var socket = config.openSocket(socketConfig),
             isofferer = _config.isofferer,
             gotstream,
             video = document.createElement('video'),
-            inner = {},
+            inner = { },
             peer;
 
         var peerConfig = {
             attachStream: config.attachStream,
-            onICE: function (candidate) {
+            onICE: function(candidate) {
                 socket.send({
                     userToken: self.userToken,
                     candidate: {
@@ -52,7 +71,7 @@
                     }
                 });
             },
-            onRemoteStream: function (stream) {
+            onRemoteStream: function(stream) {
                 if (!stream) return;
 
                 video[moz ? 'mozSrcObject' : 'src'] = moz ? stream : webkitURL.createObjectURL(stream);
@@ -73,19 +92,27 @@
 
             peer = RTCPeerConnection(peerConfig);
         }
+        
+        function afterRemoteStreamStartedFlowing() {
+            gotstream = true;
+
+            config.onRemoteStream({
+                video: video,
+                stream: _config.stream
+            });
+
+            /* closing subsocket here on the offerer side */
+            if (_config.closeSocket) socket = null;
+        }
 
         function onRemoteStreamStartsFlowing() {
+            if(navigator.userAgent.match(/Android|iPhone|iPad|iPod|BlackBerry|IEMobile/i)) {
+                // if mobile device
+                return afterRemoteStreamStartedFlowing();
+            }
+            
             if (!(video.readyState <= HTMLMediaElement.HAVE_CURRENT_DATA || video.paused || video.currentTime <= 0)) {
-                gotstream = true;
-
-                config.onRemoteStream({
-                    video: video,
-                    stream: _config.stream
-                });
-
-                /* closing subsocket here on the offerer side */
-                if (_config.closeSocket) socket = null;
-
+                afterRemoteStreamStartedFlowing();
             } else setTimeout(onRemoteStreamStartsFlowing, 50);
         }
 
@@ -158,7 +185,7 @@
     }
 
     function startBroadcasting() {
-        defaultSocket.send({
+        defaultSocket && defaultSocket.send({
             roomToken: self.roomToken,
             roomName: self.roomName,
             broadcaster: self.userToken
@@ -167,15 +194,15 @@
     }
 
     function uniqueToken() {
-        var s4 = function () {
+        var s4 = function() {
             return Math.floor(Math.random() * 0x10000).toString(16);
         };
         return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
     }
-	
-	openDefaultSocket();
+
+    openDefaultSocket();
     return {
-        createRoom: function (_config) {
+        createRoom: function(_config) {
             self.roomName = _config.roomName || 'Anonymous';
             self.roomToken = uniqueToken();
 
@@ -183,7 +210,7 @@
             isGetNewRoom = false;
             startBroadcasting();
         },
-        joinRoom: function (_config) {
+        joinRoom: function(_config) {
             self.roomToken = _config.roomToken;
             isGetNewRoom = false;
 

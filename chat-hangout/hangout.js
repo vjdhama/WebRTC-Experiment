@@ -1,4 +1,11 @@
-﻿var hangout = function (config) {
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+// This library is known as multi-user connectivity wrapper!
+// It handles connectivity tasks to make sure two or more users can interconnect!
+
+var hangout = function(config) {
     var self = {
         userToken: uniqueToken(),
         userName: 'Anonymous'
@@ -6,10 +13,16 @@
         channels = '--',
         isbroadcaster,
         isGetNewRoom = true,
-		defaultSocket = {}, RTCDataChannels = [];
+        sockets = [],
+        defaultSocket = { }, RTCDataChannels = [];
 
     function openDefaultSocket() {
-        defaultSocket = config.openSocket({onmessage: onDefaultSocketResponse});
+        defaultSocket = config.openSocket({
+            onmessage: onDefaultSocketResponse,
+            callback: function(socket) {
+                defaultSocket = socket;
+            }
+        });
     }
 
     function onDefaultSocketResponse(response) {
@@ -17,7 +30,7 @@
 
         if (isGetNewRoom && response.roomToken && response.broadcaster) config.onRoomFound(response);
 
-        if (response.newParticipant) onNewParticipant(response.newParticipant);
+        if (response.newParticipant && self.joinedARoom && self.broadcasterid == response.userToken) onNewParticipant(response.newParticipant);
 
         if (response.userToken && response.joinUser == self.userToken && response.participant && channels.indexOf(response.userToken) == -1) {
             channels += response.userToken + '--';
@@ -28,30 +41,31 @@
             });
         }
     }
-	
-	function getPort() {
-        return Math.random() * 1000 << 10;
-    }
 
     function openSubSocket(_config) {
         if (!_config.channel) return;
         var socketConfig = {
             channel: _config.channel,
             onmessage: socketResponse,
-            onopen: function () {
+            onopen: function() {
                 if (isofferer && !peer) initPeer();
+                sockets[sockets.length] = socket;
             }
+        };
+
+        socketConfig.callback = function(_socket) {
+            socket = _socket;
+            this.onopen();
         };
 
         var socket = config.openSocket(socketConfig),
             isofferer = _config.isofferer,
             gotstream,
-            inner = {},
-			dataPorts = [getPort(), getPort()],
+            inner = { },
             peer;
 
         var peerConfig = {
-            onICE: function (candidate) {
+            onICE: function(candidate) {
                 socket.send({
                     userToken: self.userToken,
                     candidate: {
@@ -61,7 +75,7 @@
                 });
             },
             onChannelOpened: onChannelOpened,
-            onChannelMessage: function (event) {
+            onChannelMessage: function(event) {
                 config.onChannelMessage(JSON.parse(event.data));
             }
         };
@@ -72,7 +86,6 @@
             } else {
                 peerConfig.offerSDP = offerSDP;
                 peerConfig.onAnswerSDP = sendsdp;
-				peerConfig.dataPorts = dataPorts;
             }
 
             peer = RTCPeerConnection(peerConfig);
@@ -95,62 +108,22 @@
                 });
             }
 
-            /* closing subsocket here on the offerer side */
-            if (_config.closeSocket) socket = null;
-
             gotstream = true;
         }
 
         function sendsdp(sdp) {
-            sdp = JSON.stringify(sdp);
-            var part = parseInt(sdp.length / 3);
-
-            var firstPart = sdp.slice(0, part),
-                secondPart = sdp.slice(part, sdp.length - 1),
-                thirdPart = '';
-
-            if (sdp.length > part + part) {
-                secondPart = sdp.slice(part, part + part);
-                thirdPart = sdp.slice(part + part, sdp.length);
-            }
-
             socket.send({
                 userToken: self.userToken,
-                firstPart: firstPart,
-
-                /* sending RTCDataChannel ports alongwith sdp */
-                dataPorts: dataPorts
-            });
-
-            socket.send({
-                userToken: self.userToken,
-                secondPart: secondPart
-            });
-
-            socket.send({
-                userToken: self.userToken,
-                thirdPart: thirdPart
+                sdp: JSON.stringify(sdp)
             });
         }
 
         function socketResponse(response) {
             if (response.userToken == self.userToken) return;
 
-            if (response.firstPart || response.secondPart || response.thirdPart) {
-				if (response.dataPorts) inner.dataPorts = response.dataPorts;
-                if (response.firstPart) {
-                    inner.firstPart = response.firstPart;
-                    if (inner.secondPart && inner.thirdPart) selfInvoker();
-                }
-                if (response.secondPart) {
-                    inner.secondPart = response.secondPart;
-                    if (inner.firstPart && inner.thirdPart) selfInvoker();
-                }
-
-                if (response.thirdPart) {
-                    inner.thirdPart = response.thirdPart;
-                    if (inner.firstPart && inner.secondPart) selfInvoker();
-                }
+            if (response.sdp) {
+                inner.sdp = JSON.parse(response.sdp);
+                selfInvoker();
             }
 
             if (response.candidate && !gotstream) {
@@ -158,6 +131,13 @@
                     sdpMLineIndex: response.candidate.sdpMLineIndex,
                     candidate: JSON.parse(response.candidate.candidate)
                 });
+            }
+
+            if (response.left) {
+                if (peer && peer.peer) {
+                    peer.peer.close();
+                    peer.peer = null;
+                }
             }
         }
 
@@ -168,16 +148,35 @@
 
             invokedOnce = true;
 
-            inner.sdp = JSON.parse(inner.firstPart + inner.secondPart + inner.thirdPart);
-            
-			/* using random data ports to support wide connection on firefox! */
-            if (isofferer) peer.addAnswerSDP(inner.sdp, inner.dataPorts);
+            if (isofferer) peer.addAnswerSDP(inner.sdp);
             else initPeer(inner.sdp);
         }
     }
 
+    function leave() {
+        var length = sockets.length;
+        for (var i = 0; i < length; i++) {
+            var socket = sockets[i];
+            if (socket) {
+                socket.send({
+                    left: true,
+                    userToken: self.userToken
+                });
+                delete sockets[i];
+            }
+        }
+    }
+
+    window.onbeforeunload = function() {
+        leave();
+    };
+
+    window.onkeyup = function(e) {
+        if (e.keyCode == 116) leave();
+    };
+
     function startBroadcasting() {
-        defaultSocket.send({
+        defaultSocket && defaultSocket.send({
             roomToken: self.roomToken,
             roomName: self.roomName,
             broadcaster: self.userToken
@@ -204,15 +203,15 @@
     }
 
     function uniqueToken() {
-        var s4 = function () {
+        var s4 = function() {
             return Math.floor(Math.random() * 0x10000).toString(16);
         };
         return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
     }
 
-	openDefaultSocket();
+    openDefaultSocket();
     return {
-        createRoom: function (_config) {
+        createRoom: function(_config) {
             self.roomName = _config.roomName || 'Anonymous';
             self.roomToken = uniqueToken();
             if (_config.userName) self.userName = _config.userName;
@@ -221,10 +220,13 @@
             isGetNewRoom = false;
             startBroadcasting();
         },
-        joinRoom: function (_config) {
+        joinRoom: function(_config) {
             self.roomToken = _config.roomToken;
             if (_config.userName) self.userName = _config.userName;
             isGetNewRoom = false;
+
+            self.joinedARoom = true;
+            self.broadcasterid = _config.joinUser;
 
             openSubSocket({
                 channel: self.userToken
@@ -236,7 +238,7 @@
                 joinUser: _config.joinUser
             });
         },
-        send: function (message) {
+        send: function(message) {
             var length = RTCDataChannels.length,
                 data = JSON.stringify({
                     message: message,
@@ -244,7 +246,9 @@
                 });
             if (!length) return;
             for (var i = 0; i < length; i++) {
-                RTCDataChannels[i].send(data);
+                if (RTCDataChannels[i].readyState == 'open') {
+                    RTCDataChannels[i].send(data);
+                }
             }
         }
     };

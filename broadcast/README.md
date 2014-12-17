@@ -1,79 +1,58 @@
-**Just copy HTML code in your site and that's all you need to do. Nothing to install! No requirements!**
+#### WebRTC One-to-Many video sharing/broadcasting / [Demo](https://www.webrtc-experiment.com/broadcast/)
 
-*Only one limitation: A link back to [Muaz Khan](http://github.com/muaz-khan)!*
+=
 
-====
-# Cross Browser Support (Interoperable)
+1. This [WebRTC](https://www.webrtc-experiment.com/) experiment is aimed to transmit audio/video stream in one-to-many style.
+2. It setups multiple peer connections to support multi-user connectivity feature. Rememebr, [WebRTC](https://www.webrtc-experiment.com/) doesn't supports 3-way handshake!
+3. Out of multi-peers establishment; many RTP-ports are opened according to number of media streamas referenced to each peer connection.
+4. Multi-ports establishment will cause huge [CPU and bandwidth usage](https://www.webrtc-experiment.com/docs/RTP-usage.html)!
 
-This [WebRTC Experiment](https://webrtc-experiment.appspot.com/broadcast/) works fine on following web-browsers:
+=
+
+If 10 users join your broadcasted room, **40 RTP ports** will be opened on your browser:
+
+1. 10 RTP ports for **outgoing** audio streams
+2. 10 RTP ports for **outgoing** video streams
+3. 10 RTP ports for **incoming** audio streams
+4. 10 RTP ports for **incoming** video streams
+
+=
+
+#### Difference between one-way broadcasting and one-to-many broadcasting
+
+For 10 users session, in one-way broadcasting:
+
+1. 10 RTP ports for outgoing audio stream
+2. 10 RTP ports for outgoing video stream
+
+i.e. total 20 **outgoing** RTP ports will be opened on your browser.
+
+On each participant's side; only 2 **incoming** RTP ports will be opened.
+
+Unlike one-way broadcasting; one-to-many broadcasting experiment opens both outgoing as well as incoming RTP ports for each participant.
+
+=
+
+For signaling; please check following page:
+
+https://github.com/muaz-khan/WebRTC-Experiment/blob/master/Signaling.md
+
+Remember, you can use any signaling implementation exists out there without modifying any single line! Just skip below code and open [above link](https://github.com/muaz-khan/WebRTC-Experiment/blob/master/Signaling.md)!
+
+=
+
+#### Browser Support 
+
+This [WebRTC Video Broadcasting Experiment](https://www.webrtc-experiment.com/broadcast/) works fine on following web-browsers:
 
 | Browser        | Support           |
-| ------------- |:-------------:|
-| Firefox | [Aurora](http://www.mozilla.org/en-US/firefox/aurora/) |
-| Firefox | [Nightly](http://nightly.mozilla.org/) |
-| Google Chrome | [Stable](https://www.google.com/intl/en_uk/chrome/browser/) |
-| Google Chrome | [Canary](https://www.google.com/intl/en/chrome/browser/canary.html) |
-| Google Chrome | [Beta](https://www.google.com/intl/en/chrome/browser/beta.html) |
-| Google Chrome | [Dev](https://www.google.com/intl/en/chrome/browser/index.html?extra=devchannel#eula) |
+| ------------- |-------------|
+| Firefox | [Stable](http://www.mozilla.org/en-US/firefox/new/) / [Aurora](http://www.mozilla.org/en-US/firefox/aurora/) / [Nightly](http://nightly.mozilla.org/) |
+| Google Chrome | [Stable](https://www.google.com/intl/en_uk/chrome/browser/) / [Canary](https://www.google.com/intl/en/chrome/browser/canary.html) / [Beta](https://www.google.com/intl/en/chrome/browser/beta.html) / [Dev](https://www.google.com/intl/en/chrome/browser/index.html?extra=devchannel#eula) |
+| Android | [Chrome Beta](https://play.google.com/store/apps/details?id=com.chrome.beta&hl=en) |
 
-## How Video Broadcast Works?
+=
 
-In simple words, multi-peers and sockets are opened to make it work!
+#### License
 
-1. Video broadcasting capability (one-to-many)
-2. Private broadcasting rooms
-
-Just copy following HTML code to enjoy video broadcasting in your own site!
-
-```html
-<table class="visible">
-    <tr>
-        <td style="text-align: right;">
-            <input type="text" id="conference-name" placeholder="Broadcast Name">
-        </td>
-        <td>
-            <button id="start-conferencing">Start Video Broadcasting</button>
-        </td>
-    </tr>
-</table>
-
-<table id="rooms-list" class="visible"></table>
-<div id="participants"></div>
-
-<script src="https://bit.ly/socket-io"></script>
-<script src="https://bit.ly/RTCPeerConnection-v1-4"></script>
-<script src="https://webrtc-experiment.appspot.com/broadcast/broadcast.js"> </script>
-<script src="https://webrtc-experiment.appspot.com/broadcast/broadcast-ui.js"></script>
-```
-
-# Use your own socket.io implementation!
-
-```javascript
-var config = {
-    // JUST change code in openSocket method
-    openSocket: function (config) {
-        // ---------------------------- from here
-        
-        var socket = io.connect('your own socket.io URL');
-
-        // set channel: 'video-broadcasting' is the default channel
-        socket.channel = config.channel || 'video-broadcasting';
-
-        // when socket opens: call 'config.onopen'
-        config.onopen && socket.on('connect', config.onopen);
-
-        // when socket gets message: call 'config.onmessage'
-        socket.on('message', config.onmessage);
-
-        // return socket object; because it will be used later
-        return socket;
-
-        // ---------------------------- to here --- and that's all you need to do!
-    }
-};
-```
-
-====
-## License & Credits
-
-Copyright (c) 2013 [Muaz Khan](https://plus.google.com/100325991024054712503) - A link back is MUST! - All rights reserved!
+WebRTC [Video Broadcasting Experiment](https://www.webrtc-experiment.com/broadcast/) is released under [MIT licence](https://www.webrtc-experiment.com/licence/) . Copyright (c) 2013 [Muaz Khan](https://plus.google.com/100325991024054712503).

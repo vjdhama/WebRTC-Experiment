@@ -1,34 +1,45 @@
-﻿var config = {
-    openSocket: function (config) {
-        if (!window.Firebase) return;
-        var channel = config.channel || location.hash.replace('#', '') || 'chat-hangout';
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+var config = {
+    openSocket: function(config) {
+        // https://github.com/muaz-khan/WebRTC-Experiment/blob/master/Signaling.md
+        // This method "openSocket" can be defined in HTML page
+        // to use any signaling gateway either XHR-Long-Polling or SIP/XMPP or WebSockets/Socket.io
+        // or WebSync/SignalR or existing implementations like signalmaster/peerserver or sockjs etc.
+
+        var channel = config.channel || location.href.replace( /\/|:|#|%|\.|\[|\]/g , '');
         var socket = new Firebase('https://chat.firebaseIO.com/' + channel);
+
         socket.channel = channel;
-        socket.on("child_added", function (data) {
+        socket.on("child_added", function(data) {
             config.onmessage && config.onmessage(data.val());
         });
-        socket.send = function (data) {
+
+        socket.send = function(data) {
             this.push(data);
-        }
+        };
+
         config.onopen && setTimeout(config.onopen, 1);
         socket.onDisconnect().remove();
         return socket;
     },
-    onRoomFound: function (room) {
+    onRoomFound: function(room) {
         var alreadyExist = document.getElementById(room.broadcaster);
         if (alreadyExist) return;
 
-        if(typeof roomsList === 'undefined') roomsList = document.body;
+        if (typeof roomsList === 'undefined') roomsList = document.body;
 
         var tr = document.createElement('tr');
         tr.setAttribute('id', room.broadcaster);
-        tr.innerHTML = '<td style="width:80%;">' + room.roomName + '</td>' +
-					   '<td><button class="join" id="' + room.roomToken + '">Join Room</button></td>';
+        tr.innerHTML = '<td>' + room.roomName + '</td>' +
+            '<td><button class="join" id="' + room.roomToken + '">Join</button></td>';
 
         roomsList.insertBefore(tr, roomsList.firstChild);
 
-        tr.onclick = function () {
-			var tr = this;
+        tr.onclick = function() {
+            tr = this;
             hangoutUI.joinRoom({
                 roomToken: tr.querySelector('.join').id,
                 joinUser: tr.id,
@@ -37,18 +48,15 @@
             hideUnnecessaryStuff();
         };
     },
-    onChannelOpened: function (/* channel */) {
-        unnecessaryStuffVisible && hideUnnecessaryStuff();
+    onChannelOpened: function(/* channel */) {
+        hideUnnecessaryStuff();
     },
-    onChannelMessage: function (data) {
-        if (!chatOutput) {
-            console.log(message);
-            return;
-        }
+    onChannelMessage: function(data) {
+        if (!chatOutput) return;
 
         var tr = document.createElement('tr');
         tr.innerHTML =
-                '<td style="width:40%;">' + data.sender + '</td>' +
+            '<td style="width:40%;">' + data.sender + '</td>' +
                 '<td>' + data.message + '</td>';
 
         chatOutput.insertBefore(tr, chatOutput.firstChild);
@@ -58,9 +66,9 @@
 function createButtonClickHandler() {
     hangoutUI.createRoom({
         userName: prompt('Enter your name', 'Anonymous'),
-        roomName: ((document.getElementById('conference-name') || { value: null }).value || 'Anonymous') + ' // shared via ' + (navigator.vendor ? 'Google Chrome (Stable/Canary)' : 'Mozilla Firefox (Aurora/Nightly)')
+        roomName: (document.getElementById('conference-name') || { }).value || 'Anonymous'
     });
-	hideUnnecessaryStuff();
+    hideUnnecessaryStuff();
 }
 
 
@@ -74,7 +82,6 @@ var roomsList = document.getElementById('rooms-list');
 
 var chatOutput = document.getElementById('chat-output');
 
-var unnecessaryStuffVisible = true;
 function hideUnnecessaryStuff() {
     var visibleElements = document.getElementsByClassName('visible'),
         length = visibleElements.length;
@@ -82,20 +89,20 @@ function hideUnnecessaryStuff() {
     for (var i = 0; i < length; i++) {
         visibleElements[i].style.display = 'none';
     }
-    unnecessaryStuffVisible = false;
 
     var chatTable = document.getElementById('chat-table');
     if (chatTable) chatTable.style.display = 'block';
     if (chatOutput) chatOutput.style.display = 'block';
+    if (chatMessage) chatMessage.disabled = false;
 }
 
 var chatMessage = document.getElementById('chat-message');
 if (chatMessage)
     chatMessage.onchange = function() {
-        hangoutUI.send(chatMessage.value);
-		var tr = document.createElement('tr');
+        hangoutUI.send(this.value);
+        var tr = document.createElement('tr');
         tr.innerHTML =
-                '<td style="width:40%;">You:</td>' +
+            '<td style="width:40%;">You:</td>' +
                 '<td>' + chatMessage.value + '</td>';
 
         chatOutput.insertBefore(tr, chatOutput.firstChild);
@@ -105,12 +112,7 @@ if (chatMessage)
 
 (function() {
     var uniqueToken = document.getElementById('unique-token');
-    if (uniqueToken) {
-        if(location.hash.length > 2) uniqueToken.parentNode.parentNode.parentNode.innerHTML = '<input type=text value="' + location.href + '" style="width:100%;text-align:center;" title="You can share this private link with your friends.">';
-        else uniqueToken.innerHTML = uniqueToken.parentNode.parentNode.href = (function() {
-            return "#private-" + ("" + 1e10).replace( /[018]/g , function(a) {
-                return (a ^ Math.random() * 16 >> a / 4).toString(16);
-            });
-        })();
-    }
+    if (uniqueToken)
+        if (location.hash.length > 2) uniqueToken.parentNode.parentNode.parentNode.innerHTML = '<h2 style="text-align:center;"><a href="' + location.href + '" target="_blank">Share this link</a></h2>';
+        else uniqueToken.innerHTML = uniqueToken.parentNode.parentNode.href = '#' + (Math.random() * new Date().getTime()).toString(36).toUpperCase().replace( /\./g , '-');
 })();

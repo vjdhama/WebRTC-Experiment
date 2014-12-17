@@ -1,16 +1,26 @@
-﻿var broadcast = function (config) {
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+// This library is known as multi-user connectivity wrapper!
+// It handles connectivity tasks to make sure two or more users can interconnect!
+
+var broadcast = function(config) {
     var self = {
         userToken: uniqueToken()
     },
-    channels = '--',
+        channels = '--',
         isbroadcaster,
         isGetNewRoom = true,
-		participants = 1,
-        defaultSocket = {};
+        participants = 1,
+        defaultSocket = { };
 
     function openDefaultSocket() {
         defaultSocket = config.openSocket({
-            onmessage: onDefaultSocketResponse
+            onmessage: onDefaultSocketResponse,
+            callback: function(socket) {
+                defaultSocket = socket;
+            }
         });
     }
 
@@ -34,21 +44,26 @@
         var socketConfig = {
             channel: _config.channel,
             onmessage: socketResponse,
-            onopen: function () {
+            onopen: function() {
                 if (isofferer && !peer) initPeer();
             }
+        };
+
+        socketConfig.callback = function(_socket) {
+            socket = _socket;
+            this.onopen();
         };
 
         var socket = config.openSocket(socketConfig),
             isofferer = _config.isofferer,
             gotstream,
             htmlElement = document.createElement(self.isAudio ? 'audio' : 'video'),
-            inner = {},
+            inner = { },
             peer;
 
         var peerConfig = {
             attachStream: config.attachStream,
-            onICE: function (candidate) {
+            onICE: function(candidate) {
                 socket.send({
                     userToken: self.userToken,
                     candidate: {
@@ -57,7 +72,7 @@
                     }
                 });
             },
-            onRemoteStream: function (stream) {
+            onRemoteStream: function(stream) {
                 if (!stream) return;
 
                 htmlElement[moz ? 'mozSrcObject' : 'src'] = moz ? stream : webkitURL.createObjectURL(stream);
@@ -65,10 +80,10 @@
 
                 _config.stream = stream;
                 if (self.isAudio) {
-                    htmlElement.addEventListener('play', function () {
+                    htmlElement.addEventListener('play', function() {
                         this.muted = false;
                         this.volume = 1;
-                        afterRemoteStreamStartedFlowing()
+                        afterRemoteStreamStartedFlowing();
                     }, false);
                 } else onRemoteStreamStartsFlowing();
             }
@@ -86,6 +101,11 @@
         }
 
         function onRemoteStreamStartsFlowing() {
+            if(navigator.userAgent.match(/Android|iPhone|iPad|iPod|BlackBerry|IEMobile/i)) {
+                // if mobile device
+                return afterRemoteStreamStartedFlowing();
+            }
+            
             if (!(htmlElement.readyState <= HTMLMediaElement.HAVE_CURRENT_DATA || htmlElement.paused || htmlElement.currentTime <= 0)) {
                 afterRemoteStreamStartedFlowing();
             } else setTimeout(onRemoteStreamStartsFlowing, 50);
@@ -153,6 +173,7 @@
                 });
             }
         }
+
         var invokedOnce = false;
 
         function selfInvoker() {
@@ -162,15 +183,14 @@
 
             inner.sdp = JSON.parse(inner.firstPart + inner.secondPart + inner.thirdPart);
             if (isofferer) {
-				peer.addAnswerSDP(inner.sdp);
-				if(config.onNewParticipant) config.onNewParticipant(participants++);
-			}
-            else initPeer(inner.sdp);
+                peer.addAnswerSDP(inner.sdp);
+                if (config.onNewParticipant) config.onNewParticipant(participants++);
+            } else initPeer(inner.sdp);
         }
     }
 
     function startBroadcasting() {
-        defaultSocket.send({
+        defaultSocket && defaultSocket.send({
             roomToken: self.roomToken,
             roomName: self.roomName,
             broadcaster: self.userToken,
@@ -180,7 +200,7 @@
     }
 
     function uniqueToken() {
-        var s4 = function () {
+        var s4 = function() {
             return Math.floor(Math.random() * 0x10000).toString(16);
         };
         return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
@@ -188,7 +208,7 @@
 
     openDefaultSocket();
     return {
-        createRoom: function (_config) {
+        createRoom: function(_config) {
             self.roomName = _config.roomName || 'Anonymous';
             self.isAudio = _config.isAudio;
             self.roomToken = uniqueToken();
@@ -197,7 +217,7 @@
             isGetNewRoom = false;
             startBroadcasting();
         },
-        joinRoom: function (_config) {
+        joinRoom: function(_config) {
             self.roomToken = _config.roomToken;
             self.isAudio = _config.isAudio;
             isGetNewRoom = false;

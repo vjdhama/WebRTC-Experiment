@@ -1,64 +1,86 @@
-====
-## WebRTC Part of Screen Sharing / [Demo](https://googledrive.com/host/0B6GWd_dUUTT8RzVSRVU2MlIxcm8/realtime-chat/)
+#### [WebRTC](https://www.webrtc-experiment.com/) [Part of Screen Sharing Demos](https://github.com/muaz-khan/WebRTC-Experiment/tree/master/part-of-screen-sharing) / [Demos](https://www.webrtc-experiment.com/part-of-screen-sharing/)
 
-Share part of screen; not the entire screen!
+Another realtime/p2p working demo: 
 
-1. Sharing part of the screen using RTCDataChannel APIs!
-2. Everything is synchronized in realtime.
-3. It is a realtime text chat with a realtime preview!
-4. You can see what your fellow is typing...in realtime!
-5. Firefox [nightly](http://nightly.mozilla.org/) / [aurora](http://www.mozilla.org/en-US/firefox/aurora/) / [stable](http://www.mozilla.org/en-US/firefox/new/) is preferred/recommended.
-6. Works fine on Chrome [canary](https://www.google.com/intl/en/chrome/browser/canary.html) too.
+* https://www.webrtc-experiment.com/RTCMultiConnection/RTCMultiConnection.sharePartOfScreen.html
 
-====
-## How realtime chat works?
+Files:
 
-1. Tick "Is Sync in Realtime" checkbox if you want to share text in realtime.
-2. Otherwise, type number of milliseconds after to synchronize your state.
-3. Tick "Is Pause Syncing" if you want to take rest.
-4. Tick "Is Code" button if you want to share "code". So, coding fonts will be used in the output panel.
+* [screenshot-dev.js](https://github.com/muaz-khan/WebRTC-Experiment/blob/master/part-of-screen-sharing/screenshot-dev.js) — developers version
+* [screenshot.js](https://github.com/muaz-khan/WebRTC-Experiment/blob/master/part-of-screen-sharing/screenshot.js) — minified
 
-====
-## How.....why.....what.....?
+```html
+<script src="//cdn.webrtc-experiment.com/screenshot.js"></script>
 
-1. Used "html2canvas" library to take screenshot of the entire webpage or part of webpage.
-2. Sharing those screenshots using RTCDataChannel APIs.
-3. Firefox is preferred because Firefox uses 16 streams by default; so it is realtime and superfast on Firefox!
-4. To share your custom part of screen; open "index.html" file; and find "renderMe" object that is getting an element by id: "render-me"....and that's all you need to do!
-
-Link html2canvas javascript library; then take screenshots like this:
-
-```javascript
-html2canvas(renderMe, {
-	onrendered: function(canvas) {
-		var dataURL = canvas.toDataURL();
-		// image.src = dataURL;
-		// context.drawImage(dataURL, x, y, width, height);
-		// firebase.push(dataURL);
-		// pubnub.send(dataURL);
-		// socketio.send(dataURL);
-		// signaler.send(dataURL);
-		// window.open(dataURL);
-	}
-});
+<!-- or Developers version -->
+<script src="//cdn.webrtc-experiment.com/screenshot-dev.js"></script>
 ```
 
-**Just copy HTML code in your site and that's all you need to do. Nothing to install! No requirements!**
+Remember, `grabMouse` is used by default. You need to make it `false` to make sure your resulting screenshot has no cursor icon.
 
-*Only one limitation: A link back to [Muaz Khan](http://github.com/muaz-khan)!*
+```javascript
+var divToShare = document.querySelector('div');
+html2canvas(divToShare, {
+    grabMouse: false,  //---- if you don't want to take mouse icon
+    onrendered: function (canvas) {
+        var screenshot = canvas.toDataURL();
+        // image.src = screenshot;
+        // context.drawImage(screenshot, x, y, width, height);
+        // firebase.push(screenshot);
+        // pubnub.send(screenshot);
+        // socketio.send(screenshot);
+        // signaler.send(screenshot);
+        // window.open(screenshot);
+    }
+});
 
-====
-## Cross Browser Support (All Experiments are interoperable!)
-[WebRTC Experiments](https://webrtc-experiment.appspot.com) works fine on following web-browsers:
+/*
+ -----Note:
+ Put above code in a function; use "requestAnimationFrame" to loop the function
+ and post/transmit DataURL in realtime!
 
-| Browser        | Support           |
-| ------------- |:-------------:|
-| Firefox | [Stable](http://www.mozilla.org/en-US/firefox/new/) |
-| Firefox | [Aurora](http://www.mozilla.org/en-US/firefox/aurora/) |
-| Firefox | [Nightly](http://nightly.mozilla.org/) |
-| Google Chrome | [Canary](https://www.google.com/intl/en/chrome/browser/canary.html) |
+ -----what above code will do?
+ Above code will take screenshot of the DIV or other HTML element and return you
+ and image. You can preview image to render in IMG element or draw to Canvas2D.
+ */
+```
 
-====
-## License & Credits
+The script allows you to take "screenshots" of webpages or parts of it, directly on the users browser. The screenshot is based on the DOM and as such may not be 100% accurate to the real representation as it does not make an actual screenshot, but builds the screenshot based on the information available on the page.
 
-Copyright (c) 2013 [Muaz Khan](https://plus.google.com/100325991024054712503) - A link back is MUST! - All rights reserved!
+1. [Using RTCDataChannel](https://www.webrtc-experiment.com/part-of-screen-sharing/webrtc-data-channel/)
+2. [Using Firebase](https://www.webrtc-experiment.com/part-of-screen-sharing/firebase/)
+3. [A realtime chat using RTCDataChannel](https://googledrive.com/host/0B6GWd_dUUTT8RzVSRVU2MlIxcm8/realtime-chat/)
+4. [A realtime chat using Firebase](https://googledrive.com/host/0B6GWd_dUUTT8RzVSRVU2MlIxcm8/realtime-chat/No-WebRTC-Chat.html)
+5. [RTCMultiConnection.js uses Part of Screen sharing API](http://www.rtcmulticonnection.org/docs/onpartofscreen/)
+
+=
+
+#### How.....why.....what.....?
+
+1. Used `html2canvas` library to take screenshot of the entire webpage or part of webpage.
+2. Sharing those screenshots using `RTCDataChannel APIs` (SCTP or RTP) or `Firebase`.
+
+**To share your custom part of screen**:
+
+1. Open `index.html` file
+2. Find `renderMe` object that is getting an element by id: `render-me`
+
+....and that's all you need to do!
+
+=
+
+#### Browser Support
+
+via: https://github.com/niklasvh/html2canvas#browser-compatibility
+
+* Firefox 3.5+
+* Google Chrome
+* Opera 12+
+* IE9+
+* Safari 6+
+
+=
+
+#### License
+
+These WebRTC [Part of Screen Sharing](https://github.com/muaz-khan/WebRTC-Experiment/tree/master/part-of-screen-sharing) experiments are released under [MIT licence](https://www.webrtc-experiment.com/licence/) . Copyright (c) [Muaz Khan](https://plus.google.com/+MuazKhan).

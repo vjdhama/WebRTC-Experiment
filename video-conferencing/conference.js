@@ -1,12 +1,26 @@
-﻿var conference = function (config) {
-    var self = { userToken: uniqueToken() },
-        channels = '--',
-        isbroadcaster,
-        isGetNewRoom = true,
-        defaultSocket = {};
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+// This library is known as multi-user connectivity wrapper!
+// It handles connectivity tasks to make sure two or more users can interconnect!
+
+var conference = function(config) {
+    var self = {
+        userToken: uniqueToken()
+    };
+    var channels = '--', isbroadcaster;
+    var isGetNewRoom = true;
+    var sockets = [];
+    var defaultSocket = { };
 
     function openDefaultSocket() {
-        defaultSocket = config.openSocket({onmessage: onDefaultSocketResponse});
+        defaultSocket = config.openSocket({
+            onmessage: onDefaultSocketResponse,
+            callback: function(socket) {
+                defaultSocket = socket;
+            }
+        });
     }
 
     function onDefaultSocketResponse(response) {
@@ -14,15 +28,19 @@
 
         if (isGetNewRoom && response.roomToken && response.broadcaster) config.onRoomFound(response);
 
-        if (response.newParticipant) onNewParticipant(response.newParticipant);
+        if (response.newParticipant && self.joinedARoom && self.broadcasterid == response.userToken) onNewParticipant(response.newParticipant);
 
         if (response.userToken && response.joinUser == self.userToken && response.participant && channels.indexOf(response.userToken) == -1) {
             channels += response.userToken + '--';
             openSubSocket({
                 isofferer: true,
-                channel: response.channel || response.userToken,
-                closeSocket: true
+                channel: response.channel || response.userToken
             });
+        }
+
+        // to make sure room is unlisted if owner leaves		
+        if (response.left && config.onRoomClosed) {
+            config.onRoomClosed(response);
         }
     }
 
@@ -31,21 +49,27 @@
         var socketConfig = {
             channel: _config.channel,
             onmessage: socketResponse,
-            onopen: function () {
+            onopen: function() {
                 if (isofferer && !peer) initPeer();
+                sockets[sockets.length] = socket;
             }
+        };
+
+        socketConfig.callback = function(_socket) {
+            socket = _socket;
+            this.onopen();
         };
 
         var socket = config.openSocket(socketConfig),
             isofferer = _config.isofferer,
             gotstream,
             video = document.createElement('video'),
-            inner = {},
+            inner = { },
             peer;
 
         var peerConfig = {
             attachStream: config.attachStream,
-            onICE: function (candidate) {
+            onICE: function(candidate) {
                 socket.send({
                     userToken: self.userToken,
                     candidate: {
@@ -54,7 +78,7 @@
                     }
                 });
             },
-            onRemoteStream: function (stream) {
+            onRemoteStream: function(stream) {
                 if (!stream) return;
 
                 video[moz ? 'mozSrcObject' : 'src'] = moz ? stream : webkitURL.createObjectURL(stream);
@@ -62,6 +86,10 @@
 
                 _config.stream = stream;
                 onRemoteStreamStartsFlowing();
+            },
+            onRemoteStreamEnded: function(stream) {
+                if (config.onRemoteStreamEnded)
+                    config.onRemoteStreamEnded(stream, video);
             }
         };
 
@@ -75,82 +103,64 @@
 
             peer = RTCPeerConnection(peerConfig);
         }
+        
+        function afterRemoteStreamStartedFlowing() {
+            gotstream = true;
 
-        function onRemoteStreamStartsFlowing() {
-            if (!(video.readyState <= HTMLMediaElement.HAVE_CURRENT_DATA || video.paused || video.currentTime <= 0)) {
-                gotstream = true;
-
+            if (config.onRemoteStream)
                 config.onRemoteStream({
                     video: video,
                     stream: _config.stream
                 });
 
-                if (isbroadcaster && channels.split('--').length > 3) {
-                    /* broadcasting newly connected participant for video-conferencing! */
-                    defaultSocket.send({
-                        newParticipant: socket.channel,
-                        userToken: self.userToken
-                    });
-                }
+            if (isbroadcaster && channels.split('--').length > 3) {
+                /* broadcasting newly connected participant for video-conferencing! */
+                defaultSocket.send({
+                    newParticipant: socket.channel,
+                    userToken: self.userToken
+                });
+            }
+        }
 
-                /* closing subsocket here on the offerer side */
-                if (_config.closeSocket) socket = null;
-
+        function onRemoteStreamStartsFlowing() {
+            if(navigator.userAgent.match(/Android|iPhone|iPad|iPod|BlackBerry|IEMobile/i)) {
+                // if mobile device
+                return afterRemoteStreamStartedFlowing();
+            }
+            
+            if (!(video.readyState <= HTMLMediaElement.HAVE_CURRENT_DATA || video.paused || video.currentTime <= 0)) {
+                afterRemoteStreamStartedFlowing();
             } else setTimeout(onRemoteStreamStartsFlowing, 50);
         }
 
         function sendsdp(sdp) {
-            sdp = JSON.stringify(sdp);
-            var part = parseInt(sdp.length / 3);
-
-            var firstPart = sdp.slice(0, part),
-                secondPart = sdp.slice(part, sdp.length - 1),
-                thirdPart = '';
-
-            if (sdp.length > part + part) {
-                secondPart = sdp.slice(part, part + part);
-                thirdPart = sdp.slice(part + part, sdp.length);
-            }
-
             socket.send({
                 userToken: self.userToken,
-                firstPart: firstPart
-            });
-
-            socket.send({
-                userToken: self.userToken,
-                secondPart: secondPart
-            });
-
-            socket.send({
-                userToken: self.userToken,
-                thirdPart: thirdPart
+                sdp: JSON.stringify(sdp)
             });
         }
 
         function socketResponse(response) {
             if (response.userToken == self.userToken) return;
-            if (response.firstPart || response.secondPart || response.thirdPart) {
-                if (response.firstPart) {
-                    inner.firstPart = response.firstPart;
-                    if (inner.secondPart && inner.thirdPart) selfInvoker();
-                }
-                if (response.secondPart) {
-                    inner.secondPart = response.secondPart;
-                    if (inner.firstPart && inner.thirdPart) selfInvoker();
-                }
-
-                if (response.thirdPart) {
-                    inner.thirdPart = response.thirdPart;
-                    if (inner.firstPart && inner.secondPart) selfInvoker();
-                }
+            if (response.sdp) {
+                inner.sdp = JSON.parse(response.sdp);
+                selfInvoker();
             }
 
             if (response.candidate && !gotstream) {
-                peer && peer.addICE({
-                    sdpMLineIndex: response.candidate.sdpMLineIndex,
-                    candidate: JSON.parse(response.candidate.candidate)
-                });
+                if (!peer) console.error('missed an ice', response.candidate);
+                else
+                    peer.addICE({
+                        sdpMLineIndex: response.candidate.sdpMLineIndex,
+                        candidate: JSON.parse(response.candidate.candidate)
+                    });
+            }
+
+            if (response.left) {
+                if (peer && peer.peer) {
+                    peer.peer.close();
+                    peer.peer = null;
+                }
             }
         }
 
@@ -161,14 +171,47 @@
 
             invokedOnce = true;
 
-            inner.sdp = JSON.parse(inner.firstPart + inner.secondPart + inner.thirdPart);
             if (isofferer) peer.addAnswerSDP(inner.sdp);
             else initPeer(inner.sdp);
         }
     }
 
+    function leave() {
+        var length = sockets.length;
+        for (var i = 0; i < length; i++) {
+            var socket = sockets[i];
+            if (socket) {
+                socket.send({
+                    left: true,
+                    userToken: self.userToken
+                });
+                delete sockets[i];
+            }
+        }
+
+        // if owner leaves; try to remove his room from all other users side
+        if (isbroadcaster) {
+            defaultSocket.send({
+                left: true,
+                userToken: self.userToken,
+                roomToken: self.roomToken
+            });
+        }
+
+        if (config.attachStream) config.attachStream.stop();
+    }
+    
+    window.addEventListener('beforeunload', function () {
+        leave();
+    }, false);
+
+    window.addEventListener('keyup', function (e) {
+        if (e.keyCode == 116)
+            leave();
+    }, false);
+
     function startBroadcasting() {
-        defaultSocket.send({
+        defaultSocket && defaultSocket.send({
             roomToken: self.roomToken,
             roomName: self.roomName,
             broadcaster: self.userToken
@@ -182,8 +225,7 @@
 
         var new_channel = uniqueToken();
         openSubSocket({
-            channel: new_channel,
-            closeSocket: true
+            channel: new_channel
         });
 
         defaultSocket.send({
@@ -195,15 +237,15 @@
     }
 
     function uniqueToken() {
-        var s4 = function () {
+        var s4 = function() {
             return Math.floor(Math.random() * 0x10000).toString(16);
         };
         return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
     }
-	
-	openDefaultSocket();
+
+    openDefaultSocket();
     return {
-        createRoom: function (_config) {
+        createRoom: function(_config) {
             self.roomName = _config.roomName || 'Anonymous';
             self.roomToken = uniqueToken();
 
@@ -211,9 +253,12 @@
             isGetNewRoom = false;
             startBroadcasting();
         },
-        joinRoom: function (_config) {
+        joinRoom: function(_config) {
             self.roomToken = _config.roomToken;
             isGetNewRoom = false;
+
+            self.joinedARoom = true;
+            self.broadcasterid = _config.joinUser;
 
             openSubSocket({
                 channel: self.userToken
@@ -224,6 +269,7 @@
                 userToken: self.userToken,
                 joinUser: _config.joinUser
             });
-        }
+        },
+        leaveRoom: leave
     };
 };

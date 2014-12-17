@@ -1,12 +1,26 @@
-﻿var broadcast = function (config) {
-    var self = { userToken: uniqueToken() },
+﻿// Muaz Khan         - www.MuazKhan.com
+// MIT License       - www.WebRTC-Experiment.com/licence
+// Experiments       - github.com/muaz-khan/WebRTC-Experiment
+
+// This library is known as multi-user connectivity wrapper!
+// It handles connectivity tasks to make sure two or more users can interconnect!
+
+var broadcast = function(config) {
+    var self = {
+        userToken: uniqueToken()
+    },
         channels = '--',
         isbroadcaster,
         isGetNewRoom = true,
-        publicSocket = {};
+        publicSocket = { };
 
     function openPublicSocket() {
-        publicSocket = config.openSocket({onmessage: onPublicSocketResponse});
+        publicSocket = config.openSocket({
+            onmessage: onPublicSocketResponse,
+            callback: function(socket) {
+                publicSocket = socket;
+            }
+        });
     }
 
     function onPublicSocketResponse(response) {
@@ -24,30 +38,31 @@
         }
     }
 
-    /*********************/
-    /* CLOSURES / PRIVATE stuff */
-    /*********************/
-
     function openSubSocket(_config) {
         if (!_config.channel) return;
         var socketConfig = {
             channel: _config.channel,
             onmessage: socketResponse,
-            onopen: function () {
+            onopen: function() {
                 if (isofferer && !peer) initPeer();
             }
+        };
+
+        socketConfig.callback = function(_socket) {
+            socket = _socket;
+            this.onopen();
         };
 
         var socket = config.openSocket(socketConfig),
             isofferer = _config.isofferer,
             gotstream,
             audio = document.createElement('audio'),
-            inner = {},
+            inner = { },
             peer;
 
         var peerConfig = {
             attachStream: config.attachStream,
-            onICE: function (candidate) {
+            onICE: function(candidate) {
                 socket.send({
                     userToken: self.userToken,
                     candidate: {
@@ -56,7 +71,7 @@
                     }
                 });
             },
-            onRemoteStream: function (stream) {
+            onRemoteStream: function(stream) {
                 if (!stream) return;
 
                 audio[moz ? 'mozSrcObject' : 'src'] = moz ? stream : webkitURL.createObjectURL(stream);
@@ -74,38 +89,35 @@
                 peerConfig.offerSDP = offerSDP;
                 peerConfig.onAnswerSDP = sendsdp;
             }
-			/* OfferToReceiveVideo MUST be false for audio-only streaming */
-			peerConfig.constraints = {
-				optional: [],
-				mandatory: {
-					OfferToReceiveAudio: true,
-					OfferToReceiveVideo: false
-				}
-			};
+            /* OfferToReceiveVideo MUST be false for audio-only streaming */
+            peerConfig.constraints = {
+                optional: [],
+                mandatory: {
+                    OfferToReceiveAudio: true,
+                    OfferToReceiveVideo: false
+                }
+            };
 
             peer = RTCPeerConnection(peerConfig);
         }
 
         function onRemoteStreamStartsFlowing() {
-			audio.addEventListener('play', function () {
-				this.muted = false;
-				this.volume = 1;
-				
-				gotstream = true;
+            audio.addEventListener('play', function() {
+                setTimeout(function() {
+                    audio.muted = false;
+                    audio.volume = 1;
 
-                config.onRemoteStream({
-                    audio: audio,
-                    stream: _config.stream
-                });
+                    window.audio = audio;
 
-                /* closing subsocket here on the offerer side */
-                if (_config.closeSocket) socket = null;
-			}, false);
+                    gotstream = true;
+
+                    config.onRemoteStream({
+                        audio: audio,
+                        stream: _config.stream
+                    });
+                }, 3000);
+            }, false);
         }
-
-        /*********************/
-        /* SendSDP (offer/answer) */
-        /*********************/
 
         function sendsdp(sdp) {
             sdp = JSON.stringify(sdp);
@@ -136,10 +148,6 @@
             });
         }
 
-        /*********************/
-        /* socket response */
-        /*********************/
-
         function socketResponse(response) {
             if (response.userToken == self.userToken) return;
             if (response.firstPart || response.secondPart || response.thirdPart) {
@@ -166,9 +174,6 @@
             }
         }
 
-        /*********************/
-        /* socket response */
-        /*********************/
         var invokedOnce = false;
 
         function selfInvoker() {
@@ -183,7 +188,7 @@
     }
 
     function startBroadcasting() {
-        publicSocket.send({
+        publicSocket && publicSocket.send({
             roomToken: self.roomToken,
             roomName: self.roomName,
             broadcaster: self.userToken
@@ -196,15 +201,15 @@
     /*********************/
 
     function uniqueToken() {
-        var s4 = function () {
+        var s4 = function() {
             return Math.floor(Math.random() * 0x10000).toString(16);
         };
         return s4() + s4() + "-" + s4() + "-" + s4() + "-" + s4() + "-" + s4() + s4() + s4();
     }
-	
-	openPublicSocket();
+
+    openPublicSocket();
     return {
-        createRoom: function (_config) {
+        createRoom: function(_config) {
             self.roomName = _config.roomName || 'Anonymous';
             self.roomToken = uniqueToken();
 
@@ -212,7 +217,7 @@
             isGetNewRoom = false;
             startBroadcasting();
         },
-        joinRoom: function (_config) {
+        joinRoom: function(_config) {
             self.roomToken = _config.roomToken;
             isGetNewRoom = false;
 
